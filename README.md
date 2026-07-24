@@ -1,16 +1,108 @@
 # EDI Openflow Parser
 
-A CoCo plugin that guides healthcare (and other industry) customers through building and extending EDI parsing pipelines on Snowflake.
+## What is this?
 
-## Overview
+EDI Openflow Parser is a Snowflake-native solution that transforms complex EDI (Electronic Data Interchange) files into structured, queryable relational data — automatically, continuously, and with config-driven extensibility.
 
-This plugin provides:
-- **7 pre-built X12 HIPAA transaction types** (834, 835, 837, 270/271, 276/277)
-- **AI-assisted extension** for any new EDI format — describe what you need, the skill generates everything
-- **Two deployment paths**: Openflow streaming (production) or Python UDF (PoC/lightweight)
-- **Gold layer AI enrichment** via Cortex AI (ICD-10 decoding, procedure classification, etc.)
+It takes X12 HIPAA transaction files (claims, enrollment, remittances, eligibility, authorizations) and:
+1. **Parses** them in-flight via Openflow (NiFi) or batch via Python stored procedure
+2. **Routes** each transaction type to its own typed landing table
+3. **Enriches** with Cortex AI in Gold Dynamic Tables (ICD-10 decoding, procedure classification)
+4. **Extends** to any new EDI format via an AI-assisted CoCo skill — no deep EDI expertise required
 
-## Install
+---
+
+## Why this matters in Healthcare
+
+### The Problem
+
+Healthcare organizations exchange billions of EDI transactions annually — claims (837), remittances (835), enrollment (834), eligibility checks (270/271), prior authorizations (278). This data is:
+
+- **Trapped in non-relational formats** — X12 segment/element structure can't be queried with standard SQL
+- **Requires specialized parsers** — each transaction type has different record boundaries, qualifiers, and field positions
+- **Brittle to extend** — adding a new format means hiring EDI consultants or writing custom code from scratch
+- **Disconnected from analytics** — most organizations can't join EDI data with their clinical or financial data estate
+
+Custom parser development typically costs $50-200K per transaction type and takes 4-12 weeks of specialized developer time.
+
+### The Solution
+
+This plugin replaces custom EDI development with a config-driven framework:
+
+| Metric | Custom Development | This Plugin |
+|--------|-------------------|-------------|
+| Cost per new format | $50-200K | ~$0 (config + AI-guided) |
+| Time to add format | 4-12 weeks | Minutes (interactive skill) |
+| EDI expertise required | Deep (X12 segment specs) | None (AI proposes mappings) |
+| Streaming support | Custom integration | Built-in (Openflow) |
+| AI enrichment | Manual LLM wiring | Native (Cortex AI in DTs) |
+| Maintenance | Per-parser codebase | Single config file |
+
+### Use Cases
+
+| Use Case | Who Benefits | What They Get |
+|----------|-------------|---------------|
+| **Claims Processing** | Revenue cycle teams | Real-time claim status, payment reconciliation, denial analytics |
+| **Eligibility Verification** | Patient access | Instant benefit/coverage queries joined with clinical data |
+| **Enrollment Management** | Member services | Automated enrollment processing, coverage gap detection |
+| **Prior Authorization** | Utilization management | Auth tracking, approval rate analytics, turnaround time |
+| **Remittance Reconciliation** | Finance teams | Payment-to-claim matching, adjustment analysis, underpayment detection |
+| **Interoperability Compliance** | IT/Compliance | Centralized EDI processing meeting HIPAA transaction standards |
+
+---
+
+## How it works
+
+```
+EDI Files (S3/SFTP/Stage)
+         │
+         ▼
+┌─────────────────────────────────────────────────────────┐
+│  Ingestion (choose one path)                            │
+│                                                         │
+│  Path A: Openflow (streaming, production)               │
+│  ListS3 → FetchS3 → SplitContent(ST*) → ParseX12ToJSON │
+│  → RouteOnAttribute → PutSnowpipeStreaming × N tables   │
+│                                                         │
+│  Path B: Python UDF Lite (batch, PoC)                   │
+│  Snowpipe → RAW_EDI → Task → parse_edi() stored proc   │
+└────────────────────────┬────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│  Landing Tables (typed VARCHAR, per transaction type)    │
+│                                                         │
+│  CLAIMS.LANDING_837_CLAIMS                              │
+│  ENROLLMENTS.LANDING_834_ENROLLMENTS                    │
+│  REMITTANCES.LANDING_835_REMITTANCES                    │
+│  ELIGIBILITY.LANDING_270_INQUIRIES                      │
+│  ... (one per transaction type)                         │
+└────────────────────────┬────────────────────────────────┘
+                         │ Dynamic Tables (10 min lag)
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│  Gold Layer (type casting + Cortex AI enrichment)       │
+│                                                         │
+│  GOLD.GOLD_CLAIMS — ICD-10 decode, chronic flag        │
+│  GOLD.GOLD_ENROLLMENTS — date normalization            │
+│  GOLD.GOLD_REMITTANCES — adjustment totals             │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Key Architecture Decisions
+
+- **Config-driven extensibility** — Adding a new transaction type = add a YAML entry + run `/edi:extend`, no parser code changes
+- **Parsing in-flight (Openflow)** — Transforms happen before data lands in Snowflake, sub-second to table
+- **All-VARCHAR landing tables** — Snowpipe Streaming compatibility; type casting deferred to Gold layer
+- **Qualifier-aware field mapping** — Same segment (e.g., NM1) maps differently based on qualifier (85=billing, IL=subscriber)
+- **AI enrichment at Gold layer only** — Landing is fast/cheap; enrichment is optional and configurable per type
+- **Three-layer enforcement** — AGENTS.md + execution_contract + PreToolUse hooks prevent architectural shortcuts
+
+---
+
+## How to Deploy
+
+### Install the Plugin
 
 ```bash
 cortex plugin install sfc-gh-akelkar/edi-openflow-parser
@@ -18,177 +110,116 @@ cortex plugin install sfc-gh-akelkar/edi-openflow-parser
 
 Or find it in the **HCLS Industry Skills** profile in Cortex Code.
 
-## Prerequisites
+### Prerequisites
 
-| Requirement | Path |
-|---|---|
-| Snowflake account with Cortex AI | Both paths |
-| Openflow runtime (Medium+) | Openflow path only |
-| Warehouse (MEDIUM recommended) | Both paths |
-| S3 or SFTP source with EDI files | Openflow path |
-| Internal stage with EDI files | Python UDF path |
+- Snowflake account in a Cortex AI-supported region
+- Role with CREATE DATABASE, CREATE SCHEMA, CREATE TABLE, CREATE DYNAMIC TABLE
+- Warehouse MEDIUM or larger
+- For Openflow path: Openflow runtime (Medium+ for Python processors)
+- For Python UDF path: Internal stage with EDI files
 
-## Quick Start
+### Deployment (Guided by CoCo)
 
-### Step 1: Install and Activate
-
-After installation, the plugin activates automatically. You'll see three new slash commands:
-- `/edi:extend` — Add support for a new EDI transaction type
-- `/edi:deploy` — Build and deploy the parsing pipeline  
-- `/edi:status` — Check pipeline health
-
-### Step 2: Extend (Add a Transaction Type)
+Run the extend command to add your transaction types:
 
 ```
-You: /edi:extend
-
-Plugin: What EDI transaction type do you want to add?
-
-You: X12 278 — Prior Authorization
-
-Plugin: [Runs gates: verifies connection, detects repo, gathers format spec]
-        [Runs phases: generates field map, landing DDL, Gold DT, tests]
-        [Writes files to your workspace or outputs code blocks]
+/edi:extend
 ```
 
-The skill walks you through interactively:
-1. **Gate 1**: Verifies your Snowflake connection and target database
-2. **Gate 2**: Detects your fork of the backbone repo (or switches to output-only mode)
-3. **Gate 3**: Gathers the format specification — from an implementation guide, AI inference, or your manual input
-4. **Phase 1**: Generates `field_maps.py` entry with segment-to-field mappings
-5. **Phase 2**: Generates typed landing table DDL (all VARCHAR for Snowpipe Streaming compatibility)
-6. **Phase 3**: Generates Gold Dynamic Table with type casting and optional AI enrichment
-7. **Phase 4**: Generates pytest stubs and sample EDI data
+CoCo guides you through gates and phases interactively:
+
+1. **Gate 1: Connection** — Verifies Snowflake account, database, Cortex AI access
+2. **Gate 2: Source Detection** — Locates plugin source in workspace, sets output mode
+3. **Gate 3: Format Specification** — Gathers what format to add (from impl guide, AI inference, or manual)
+4. **Phase 1: Field Map** — Generates segment-to-field mappings with AI assistance
+5. **Phase 2: Landing DDL** — Generates typed landing table (compile-checked)
+6. **Phase 3: Gold DT** — Generates Dynamic Table with casts + optional AI enrichment
+7. **Phase 4: Tests** — Generates pytest stubs and sample EDI data
 
 Each phase requires your approval before proceeding.
 
-### Step 3: Deploy
+### Post-Deployment
 
 ```
-You: /edi:deploy
-
-Plugin: Which deployment path?
-        A) Openflow (streaming, production)
-        B) Python UDF Lite (batch, no Openflow needed)
+/edi:extend       # Add or customize an EDI transaction format
+/edi:deploy       # Build NAR + wire Openflow, or deploy Python UDF
+/edi:status       # Check pipeline health (DT refresh, row counts, errors)
 ```
 
-**Openflow path** builds the NiFi NAR, uploads it, and wires the flow:
-```
-S3 → ListS3 → FetchS3 → SplitContent → ParseX12ToJSON → RouteOnAttribute → PutSnowpipeStreaming
-```
+---
 
-**Python UDF path** deploys a stored procedure + scheduled task:
-```
-Stage → Snowpipe → RAW_EDI → Task (5 min) → parse_edi() proc → Typed Tables
-```
+## What's in the Plugin
 
-### Step 4: Monitor
+| Component | Purpose |
+|-----------|---------|
+| `AGENTS.md` | Enforcement rules — prevents architectural shortcuts |
+| `plugin.json` | Manifest with execution_contract + hook definitions |
+| `execution_contract.json` | Quality gates, prohibited patterns, pipeline order |
+| `hooks/enforce-contract.sh` | Hard-blocks unsafe DDL patterns (PreToolUse) |
+| `commands/` | Slash commands: extend, deploy, status |
+| `config/edi_format_specs.yaml` | Format family definitions (X12, EDIFACT, flat) |
+| `config/x12_known_types.yaml` | Pre-built transaction type field maps (authoritative source) |
+| `src/x12_processors/` | Bundled parsing engine (NiFi processor + field maps) |
+| `sql/` | Infrastructure DDL (prerequisites, landing tables, Gold DTs) |
+| `tests/` | Unit tests + sample X12 files + demo walkthrough |
 
-```
-You: /edi:status
+### Composed Skills (Domain Logic)
 
-Plugin: EDI Pipeline Status
-        =====================
-        Landing Tables:
-          CLAIMS.LANDING_837_CLAIMS       | 1,234,567 rows | Lag: 3 min
-          ENROLLMENTS.LANDING_834_ENROLL  |   456,789 rows | Lag: 7 min
-        
-        Gold Dynamic Tables:
-          GOLD.GOLD_CLAIMS                | ACTIVE | Last refresh: SUCCESS
-        
-        Errors (last 24h): 0
-```
+| Skill | What It Does |
+|-------|-------------|
+| `edi-router` | Intent routing — classifies extend/deploy/status and loads sub-skill |
+| `edi-extend` | 3-gate, 4-phase pipeline: validate → field map → DDL → Gold DT → tests |
+| `edi-deploy` | Dual-path deployment: Openflow NAR build + wiring, or Python UDF + Task |
+| `edi-status` | Pipeline health monitoring: DT refresh, row counts, streaming lag, errors |
 
-## Architecture
+---
 
-```
-Source (S3/SFTP/Stage)
-    │
-    ├─── Openflow Path (streaming/production) ────────────────────────────┐
-    │    ListS3 → FetchS3 → SplitContent(ST*) → ParseX12ToJSON (NAR)    │
-    │    → RouteOnAttribute → PutSnowpipeStreaming × N typed tables       │
-    │                                                                     │
-    ├─── Python UDF Lite Path (PoC/lightweight) ──────────────────────────┐
-    │    Snowpipe → RAW_EDI table → Scheduled Task → parse_edi() proc    │
-    │    → Typed Landing Tables                                           │
-    │                                                                     │
-    └─── Snowflake ───────────────────────────────────────────────────────┘
-         Landing Tables (VARCHAR, per tx type)
-              │
-              ▼
-         Gold Dynamic Tables (type casting + Cortex AI enrichment)
-```
+## Snowflake Features Used
 
-## Pre-Built Transaction Types
+| Feature | How It's Used |
+|---------|---------------|
+| **Openflow (NiFi on SPCS)** | Streaming ingestion: parse X12 in-flight via custom Python processor |
+| **Snowpipe Streaming** | Sub-second landing into typed tables from Openflow |
+| **Dynamic Tables** | Gold layer: automatic refresh with type casting + AI enrichment |
+| **Cortex AI (AI_COMPLETE)** | ICD-10 code decoding, procedure classification, urgency scoring |
+| **Python Stored Procedures** | Lite path: parse_edi() for batch processing without Openflow |
+| **Tasks** | Scheduled parsing (lite path): process new files every 5 minutes |
+| **Snowpipe** | Auto-ingest from stage to RAW_EDI table (lite path) |
+| **Stages** | Source file storage for batch processing |
+| **Network Policies** | SPCS container IP allow-listing for Openflow auth |
 
-| Code | Name | Boundary Segment | Industry |
-|------|------|-----------------|----------|
-| 837 | Health Care Claim | CLM | Healthcare |
-| 835 | Claim Payment/Remittance | CLP | Healthcare |
-| 834 | Benefit Enrollment | INS | Healthcare |
-| 270 | Eligibility Inquiry | HL | Healthcare |
-| 271 | Eligibility Response | HL | Healthcare |
-| 276 | Claim Status Request | HL | Healthcare |
-| 277 | Claim Status Response | HL | Healthcare |
+---
 
-## Adding Your Own Format
+## Transaction Types Supported
 
-The plugin is **config-driven**. Transaction types are defined in `config/x12_known_types.yaml`. Each entry specifies:
-- Record boundary segment (what delimits individual records)
-- Qualifier-aware field mappings (e.g., `NM1_85` = billing provider)
-- Landing schema and table names
-- Gold layer enrichment strategy
+Out of the box (configurable via YAML):
 
-You can add formats manually by editing the YAML, or use `/edi:extend` for the guided AI-assisted workflow.
+| Code | Name | Key Fields Extracted | Example Use |
+|------|------|---------------------|-------------|
+| 837 | Health Care Claim | Claim ID, diagnosis codes, procedures, providers, amounts, dates | Claim analytics, denial management |
+| 835 | Claim Payment/Remittance | Claim ID, payment amount, adjustments, service lines | Payment reconciliation, underpayment detection |
+| 834 | Benefit Enrollment | Member ID, demographics, coverage dates, plan info | Enrollment tracking, coverage gap analysis |
+| 270 | Eligibility Inquiry | Subscriber, provider, service type, date range | Eligibility verification automation |
+| 271 | Eligibility Response | Benefits, coverage levels, copays, deductibles | Real-time benefit display |
+| 276 | Claim Status Request | Trace number, claim reference, service dates | Claim follow-up automation |
+| 277 | Claim Status Response | Status codes, action codes, payment amounts | Denial tracking, appeal prioritization |
 
-## Output Modes
+Adding a custom type: run `/edi:extend` or edit `config/x12_known_types.yaml`. No code changes required.
 
-| Mode | When | Behavior |
-|------|------|----------|
-| **Write** | Backbone repo detected in workspace | Files written directly to your repo |
-| **Dry-run** | No repo detected, or user preference | Code blocks output for manual copy |
+---
 
-## Parsing Engine
+## Security and Governance
 
-The X12 parsing engine is bundled in `src/x12_processors/`:
-- `ParseX12ToJSON.py` — NiFi FlowFileTransform processor (also usable standalone)
-- `field_maps.py` — Qualifier-aware segment-to-field mappings for all supported types
+| Control | Implementation |
+|---------|---------------|
+| Execution contract | Strict mode — prohibited patterns enforced at tool-call level |
+| PreToolUse hook | Blocks ad-hoc DDL, manual NAR packaging, network policy changes without confirmation |
+| Network policy verification | SPCS container IPs validated before deployment (prevents account lockout) |
+| All-VARCHAR landing | No implicit type coercion at ingest — prevents data loss from casting errors |
+| Quality gates | Every generated artifact compile-checked before user sees it |
+| Phase-gated workflow | User must approve each generation step — no batch execution |
 
-Build the NAR (for Openflow deployment):
-```bash
-pip install hatch hatch-datavolo-nar
-hatch build --target nar
-```
-
-Run tests:
-```bash
-pip install -e ".[dev]"
-pytest tests/ -v
-```
-
-## Plugin Structure
-
-```
-edi-openflow-parser/
-├── .cortex-plugin/          # Plugin manifest, execution contract, hooks
-├── src/x12_processors/      # Parsing engine (bundled)
-│   ├── ParseX12ToJSON.py    # NiFi Python processor
-│   └── field_maps.py        # Segment-to-field mappings
-├── sql/                     # Infrastructure DDL (landing tables, Gold DTs)
-├── data/                    # Sample EDI files
-├── commands/                # Slash command definitions (/edi:extend, etc.)
-├── config/                  # Format specs and pre-built type definitions
-├── hooks/                   # PreToolUse enforcement (blocks unsafe DDL)
-├── reference/               # X12 segment reference, competitive positioning
-├── scripts/                 # Health check SQL
-├── skills/                  # Router + sub-skills (extend, deploy, status)
-│   ├── edi-router/          # Intent routing
-│   ├── edi-extend/          # Gates → Phases for adding formats
-│   ├── edi-deploy/          # NAR build + Openflow wiring (or UDF lite)
-│   └── edi-status/          # Pipeline health monitoring
-├── tests/                   # Unit tests + sample data + demo walkthroughs
-└── pyproject.toml           # NAR build config (hatch-datavolo-nar)
-```
+---
 
 ## License
 
