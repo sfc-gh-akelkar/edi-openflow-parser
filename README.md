@@ -1,5 +1,19 @@
 # X12 EDI Parser for Snowflake
 
+## Table of Contents
+
+- [What is this?](#what-is-this)
+- [Why this matters in Healthcare](#why-this-matters-in-healthcare)
+- [How it works](#how-it-works)
+- [How to Deploy](#how-to-deploy)
+- [Getting Started Prompts](#getting-started-prompts)
+- [What's in the Plugin](#whats-in-the-plugin)
+- [Snowflake Features Used](#snowflake-features-used)
+- [Transaction Types Supported](#transaction-types-supported)
+- [Security and Governance](#security-and-governance)
+
+---
+
 ## What is this?
 
 X12 EDI Parser is a Snowflake-native solution that transforms ASC X12 HIPAA transaction files into structured, queryable relational data — automatically, continuously, and with config-driven extensibility.
