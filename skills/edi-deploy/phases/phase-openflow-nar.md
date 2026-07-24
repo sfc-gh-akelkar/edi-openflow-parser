@@ -24,7 +24,7 @@ Build the NiFi NAR (NiFi Archive) file containing the ParseX12ToJSON processor a
 
 3. **Build NAR**:
    ```bash
-   cd {repo_root}
+   cd {plugin_root}
    hatch build --target nar
    ```
 

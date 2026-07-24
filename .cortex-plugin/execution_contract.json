@@ -3,7 +3,7 @@
   "description": "Execution guardrails for the EDI Openflow Parser plugin",
 
   "infrastructure": {
-    "backbone_repo": "https://github.com/sfc-gh-akelkar/x12-openflow-quickstart",
+    "parser_source": "src/x12_processors/",
     "required_database": "X12_EDI_AI",
     "required_schemas": ["CLAIMS", "ENROLLMENTS", "REMITTANCES", "GOLD"],
     "openflow_runtime_size": "MEDIUM"

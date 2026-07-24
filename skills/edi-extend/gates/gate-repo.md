@@ -1,46 +1,47 @@
 ---
 name: gate-repo
-description: Detect or clone the x12-openflow-quickstart backbone repo
+description: Locate the plugin's bundled parsing engine and set output mode
 parent_skill: edi-extend
 gate_id: G2
 ---
 
-# Gate: Repository Detection
+# Gate: Plugin Source Detection
 
 ## Purpose
-Ensure the user has a local copy of the backbone repo so generated code can be written to the correct locations.
+Locate the plugin's bundled parsing engine (`src/x12_processors/`) and determine the output mode for generated code.
 
 ## Steps
 
-1. **Scan workspace** for indicators:
+1. **Locate plugin root**: Find the `edi-openflow-parser` directory containing:
    - `pyproject.toml` with `hatch-datavolo-nar` in build-system requires
    - `src/x12_processors/ParseX12ToJSON.py`
    - `src/x12_processors/field_maps.py`
+   - `config/x12_known_types.yaml`
 
-2. **If found**: Report location, confirm this is the working copy
+2. **If found**: Report location, confirm this is the working copy. The plugin is self-contained — all source lives here.
 
-3. **If not found**: Ask user:
+3. **If not found** (plugin was loaded from catalog but user wants to modify source):
    ```
-   I don't see the x12-openflow-quickstart repo in your workspace.
+   The plugin's parsing engine is bundled but not editable in your current workspace.
    
    Options:
-   A) Clone it now (from https://github.com/sfc-gh-akelkar/x12-openflow-quickstart)
-   B) Point me to an existing clone elsewhere
-   C) Continue in dry-run mode (I'll output code blocks instead of writing files)
+   A) Clone the plugin repo locally for editing (git clone https://github.com/sfc-gh-akelkar/edi-openflow-parser)
+   B) Continue in dry-run mode (I'll output code blocks for you to apply)
    ```
 
 4. **Set output mode**:
-   - Repo found → write mode (default)
-   - Option C or user preference → dry-run mode
+   - Plugin source found in workspace → write mode (default)
+   - User preference or no writable source → dry-run mode
 
 ## Pass Criteria
-- Either: backbone repo located in workspace AND output mode = write
-- Or: output mode = dry-run (no repo needed)
+- Plugin root located with parser source present, OR
+- Output mode set to dry-run
 
 ## Context for Next Gates
 Pass the following to subsequent phases:
-- `repo_root`: absolute path to backbone repo (or null for dry-run)
-- `field_maps_path`: path to `field_maps.py`
+- `plugin_root`: absolute path to plugin directory
+- `field_maps_path`: path to `src/x12_processors/field_maps.py`
 - `sql_dir`: path to `sql/` directory
 - `tests_dir`: path to `tests/` directory
+- `config_dir`: path to `config/` directory
 - `output_mode`: "write" or "dry_run"

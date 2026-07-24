@@ -159,17 +159,34 @@ You can add formats manually by editing the YAML, or use `/edi:extend` for the g
 | Agentic workflow | CoCo plugin + guided extension | None |
 | Format families | X12 now, EDIFACT/flat ready | X12 only |
 
-## Backbone Repo
+## Parsing Engine
 
-The parsing engine lives in a separate repo that this plugin extends:
+The X12 parsing engine is bundled in `src/x12_processors/`:
+- `ParseX12ToJSON.py` — NiFi FlowFileTransform processor (also usable standalone)
+- `field_maps.py` — Qualifier-aware segment-to-field mappings for all supported types
 
-[sfc-gh-akelkar/x12-openflow-quickstart](https://github.com/sfc-gh-akelkar/x12-openflow-quickstart)
+Build the NAR (for Openflow deployment):
+```bash
+pip install hatch hatch-datavolo-nar
+hatch build --target nar
+```
+
+Run tests:
+```bash
+pip install -e ".[dev]"
+pytest tests/ -v
+```
 
 ## Plugin Structure
 
 ```
 edi-openflow-parser/
 ├── .cortex-plugin/          # Plugin manifest, execution contract, hooks
+├── src/x12_processors/      # Parsing engine (bundled)
+│   ├── ParseX12ToJSON.py    # NiFi Python processor
+│   └── field_maps.py        # Segment-to-field mappings
+├── sql/                     # Infrastructure DDL (landing tables, Gold DTs)
+├── data/                    # Sample EDI files
 ├── commands/                # Slash command definitions (/edi:extend, etc.)
 ├── config/                  # Format specs and pre-built type definitions
 ├── hooks/                   # PreToolUse enforcement (blocks unsafe DDL)
@@ -180,7 +197,8 @@ edi-openflow-parser/
 │   ├── edi-extend/          # Gates → Phases for adding formats
 │   ├── edi-deploy/          # NAR build + Openflow wiring (or UDF lite)
 │   └── edi-status/          # Pipeline health monitoring
-└── tests/                   # Demo walkthroughs
+├── tests/                   # Unit tests + sample data + demo walkthroughs
+└── pyproject.toml           # NAR build config (hatch-datavolo-nar)
 ```
 
 ## License

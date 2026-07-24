@@ -13,18 +13,19 @@ You are the orchestrator for extending the EDI parsing framework with a new tran
 
 ## Architecture
 
-The backbone parser (`ParseX12ToJSON.py`) uses a **config-driven** approach:
+The parsing engine is bundled in `src/x12_processors/`:
+- `ParseX12ToJSON.py` uses a **config-driven** approach
 - `field_maps.py` defines per-transaction-type field mappings
 - Each transaction type has a `record_boundary_segment` that delimits individual records
 - Segments are mapped using qualifier-aware keys (e.g., `NM1_85` for billing provider, `NM1_IL` for subscriber)
 - The parser routes output to different Snowpipe Streaming channels based on `x12.transaction.types` attribute
 
-**To add a new transaction type, you generate:**
-1. A field map entry (Python dict for `field_maps.py`)
+**To add a new transaction type, you generate (all within this plugin):**
+1. A field map entry (Python dict for `src/x12_processors/field_maps.py`)
 2. GS/ST code mappings
-3. A typed landing table (all VARCHAR — Snowpipe Streaming constraint)
-4. A Gold Dynamic Table (type casting + optional AI enrichment)
-5. Test stubs with sample data
+3. A typed landing table (all VARCHAR — Snowpipe Streaming constraint) in `sql/`
+4. A Gold Dynamic Table (type casting + optional AI enrichment) in `sql/`
+5. Test stubs with sample data in `tests/`
 
 ## Execution Flow
 
