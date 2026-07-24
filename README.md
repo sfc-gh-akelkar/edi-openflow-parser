@@ -148,17 +148,6 @@ You can add formats manually by editing the YAML, or use `/edi:extend` for the g
 | **Write** | Backbone repo detected in workspace | Files written directly to your repo |
 | **Dry-run** | No repo detected, or user preference | Code blocks output for manual copy |
 
-## Competitive Positioning
-
-| Capability | This Plugin | Databricks |
-|---|---|---|
-| Pre-built parsers | 7 X12 types | 2 (837, 835) |
-| Extensibility | Skill-guided, AI-assisted | Manual Python |
-| Streaming | Openflow + Snowpipe Streaming | Spark Streaming |
-| AI enrichment | Cortex AI in Gold DTs | Manual LLM |
-| Agentic workflow | CoCo plugin + guided extension | None |
-| Format families | X12 now, EDIFACT/flat ready | X12 only |
-
 ## Parsing Engine
 
 The X12 parsing engine is bundled in `src/x12_processors/`:
