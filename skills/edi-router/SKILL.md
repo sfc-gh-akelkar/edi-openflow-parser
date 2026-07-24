@@ -20,7 +20,7 @@ Classify the user's request into one of three workflows:
 
 | Intent | Trigger Phrases | Target Skill |
 |--------|----------------|--------------|
-| **Extend** | "add a new format", "support 278", "extend for EDIFACT", "new transaction type", "customize field map", "add EDI type" | `skills/edi-extend/SKILL.md` |
+| **Extend** | "add a new format", "support 278", "new transaction type", "customize field map", "add X12 type" | `skills/edi-extend/SKILL.md` |
 | **Deploy** | "build the NAR", "deploy pipeline", "wire openflow", "push to production", "set up ingestion", "deploy UDF" | `skills/edi-deploy/SKILL.md` |
 | **Status** | "pipeline health", "check status", "how is it running", "DT refresh", "error count", "monitoring" | `skills/edi-status/SKILL.md` |
 

@@ -14,14 +14,13 @@ Determine what EDI format the user wants to add and gather enough information to
 
 1. **Ask what format** (if not already stated):
    ```
-   What EDI transaction type do you want to add?
+   What X12 transaction type do you want to add?
    
    Examples:
    - X12 278 (Prior Authorization Request/Response)
    - X12 820 (Payment Order/Remittance)
    - X12 999 (Implementation Acknowledgment)
-   - EDIFACT ORDERS (Purchase Order)
-   - Custom format (describe it)
+   - Custom X12 type (describe it)
    ```
 
 2. **Check if already known**: Look in `config/x12_known_types.yaml`

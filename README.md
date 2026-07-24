@@ -1,14 +1,14 @@
-# EDI Openflow Parser
+# X12 EDI Parser for Snowflake
 
 ## What is this?
 
-EDI Openflow Parser is a Snowflake-native solution that transforms complex EDI (Electronic Data Interchange) files into structured, queryable relational data — automatically, continuously, and with config-driven extensibility.
+X12 EDI Parser is a Snowflake-native solution that transforms ASC X12 HIPAA transaction files into structured, queryable relational data — automatically, continuously, and with config-driven extensibility.
 
-It takes X12 HIPAA transaction files (claims, enrollment, remittances, eligibility, authorizations) and:
+It takes X12 transaction files (claims, enrollment, remittances, eligibility, authorizations) and:
 1. **Parses** them in-flight via Openflow (NiFi) or batch via Python stored procedure
 2. **Routes** each transaction type to its own typed landing table
 3. **Enriches** with Cortex AI in Gold Dynamic Tables (ICD-10 decoding, procedure classification)
-4. **Extends** to any new EDI format via an AI-assisted CoCo skill — no deep EDI expertise required
+4. **Extends** to any new X12 transaction type via an AI-assisted CoCo skill — no deep EDI expertise required
 
 ---
 
@@ -20,8 +20,8 @@ Healthcare organizations exchange billions of EDI transactions annually — clai
 
 - **Trapped in non-relational formats** — X12 segment/element structure can't be queried with standard SQL
 - **Requires specialized parsers** — each transaction type has different record boundaries, qualifiers, and field positions
-- **Brittle to extend** — adding a new format means hiring EDI consultants or writing custom code from scratch
-- **Disconnected from analytics** — most organizations can't join EDI data with their clinical or financial data estate
+- **Brittle to extend** — adding a new X12 transaction type means hiring EDI consultants or writing custom code from scratch
+- **Disconnected from analytics** — most organizations can't join X12 data with their clinical or financial data estate
 
 Custom parser development typically costs $50-200K per transaction type and takes 4-12 weeks of specialized developer time.
 
@@ -157,7 +157,7 @@ Each phase requires your approval before proceeding.
 | `execution_contract.json` | Quality gates, prohibited patterns, pipeline order |
 | `hooks/enforce-contract.sh` | Hard-blocks unsafe DDL patterns (PreToolUse) |
 | `commands/` | Slash commands: extend, deploy, status |
-| `config/edi_format_specs.yaml` | Format family definitions (X12, EDIFACT, flat) |
+| `config/edi_format_specs.yaml` | X12 format configuration and deployment defaults |
 | `config/x12_known_types.yaml` | Pre-built transaction type field maps (authoritative source) |
 | `src/x12_processors/` | Bundled parsing engine (NiFi processor + field maps) |
 | `sql/` | Infrastructure DDL (prerequisites, landing tables, Gold DTs) |

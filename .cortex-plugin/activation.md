@@ -4,7 +4,7 @@ Welcome to the **EDI Openflow Parser** plugin. This plugin helps you build and e
 
 ## What This Plugin Does
 
-1. **Extend**: Add support for new EDI transaction types (X12, EDIFACT, or custom formats) with AI-assisted field map generation
+1. **Extend**: Add support for new X12 transaction types with AI-assisted field map generation
 2. **Deploy**: Build the NiFi NAR processor, wire the Openflow flow, or deploy the Python UDF alternative
 3. **Monitor**: Check pipeline health, DT refresh status, and error counts
 
