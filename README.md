@@ -141,9 +141,80 @@ Each phase requires your approval before proceeding.
 ### Post-Deployment
 
 ```
-/edi:extend       # Add or customize an EDI transaction format
+/edi:extend       # Add or customize an X12 transaction format
 /edi:deploy       # Build NAR + wire Openflow, or deploy Python UDF
 /edi:status       # Check pipeline health (DT refresh, row counts, errors)
+```
+
+---
+
+## Getting Started Prompts
+
+Copy-paste these into Cortex Code to get started:
+
+### First-Time Setup
+
+```
+/edi:extend
+
+I need to process X12 837 Professional claims from our clearinghouse.
+Set up the database, landing tables, and Gold layer with ICD-10 enrichment.
+```
+
+### Add a New Transaction Type
+
+```
+/edi:extend
+
+Add support for X12 278 Prior Authorization transactions. I don't have
+an implementation guide — use AI to propose the field mappings based on
+the standard. We need to track authorization numbers, decision codes,
+and approved quantities.
+```
+
+### Deploy the Streaming Pipeline
+
+```
+/edi:deploy
+
+Deploy the Openflow streaming path. My EDI files land in S3 bucket
+"my-company-edi-inbound" under the prefix "x12/claims/". I already
+have an Openflow runtime called "prod_runtime".
+```
+
+### Deploy Without Openflow
+
+```
+/edi:deploy
+
+I don't have Openflow. Deploy the Python UDF lite path so I can
+process X12 files from an internal stage on a 5-minute schedule.
+```
+
+### Check Pipeline Health
+
+```
+/edi:status
+
+Show me the current state of my EDI pipeline — row counts, DT refresh
+status, and any errors in the last 24 hours.
+```
+
+### Customize an Existing Type
+
+```
+/edi:extend
+
+I need to add fields to the existing 835 remittance parser. Our payer
+sends a PLB (Provider Level Balance) segment that we're not capturing.
+Add fields for PLB adjustment reason and amount.
+```
+
+### Explore What's Supported
+
+```
+What X12 transaction types does this plugin support? Show me the field
+maps for 837 claims — I want to see what fields are being extracted.
 ```
 
 ---
