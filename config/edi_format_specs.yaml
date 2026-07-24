@@ -1,0 +1,38 @@
+# EDI Format Specifications
+# This is the master config for the edi-openflow-parser plugin.
+# To add a new format: run /edi:extend or manually add an entry here.
+
+format_families:
+  x12:
+    name: "ASC X12"
+    description: "American National Standards Institute X12 Electronic Data Interchange"
+    delimiter_detection: "ISA-based"
+    segment_terminator_position: 105
+    element_separator_position: 3
+    sub_element_position: 104
+    envelope_segments: ["ISA", "GS", "ST", "SE", "GE", "IEA"]
+    industries: ["healthcare", "finance", "insurance", "logistics"]
+
+  edifact:
+    name: "UN/EDIFACT"
+    description: "United Nations Electronic Data Interchange for Administration, Commerce and Transport"
+    delimiter_detection: "UNA-based"
+    envelope_segments: ["UNA", "UNB", "UNH", "UNT", "UNZ"]
+    industries: ["logistics", "trade", "customs"]
+    status: "placeholder"
+
+  flat_edi:
+    name: "Fixed-Width EDI"
+    description: "Positional/fixed-width EDI formats (custom per trading partner)"
+    delimiter_detection: "positional"
+    industries: ["finance", "manufacturing"]
+    status: "placeholder"
+
+# Default deployment targets
+defaults:
+  database: "X12_EDI_AI"
+  warehouse: "APP_WH"
+  openflow_runtime_size: "MEDIUM"
+  gold_ai_model: "claude-sonnet-4-6"
+  landing_column_type: "VARCHAR"
+  dynamic_table_lag: "10 minutes"
