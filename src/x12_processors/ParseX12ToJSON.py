@@ -162,6 +162,21 @@ class ParseX12ToJSON(FlowFileTransform):
                 boundary_seg = None
 
             elif tx_base is not None:
+                # Reset subscriber/patient scope on SBR to prevent
+                # cross-contamination in multi-subscriber 837s.
+                # SBR starts a new subscriber loop — finalize any open claim
+                # and clear subscriber fields from tx_base.
+                if seg_id == "SBR" and tx_type == "837":
+                    if current_record is not None:
+                        self._finalize_record(records, current_record, tx_type, allowed_types, include_raw, current_raw)
+                        current_raw = []
+                        current_record = None
+                    subscriber_fields = [k for k in list(tx_base.keys()) if k.startswith(
+                        ("subscriber_", "patient_", "payer_responsibility", "individual_relationship")
+                    )]
+                    for k in subscriber_fields:
+                        del tx_base[k]
+
                 if boundary_seg and seg_id == boundary_seg:
                     if current_record is not None:
                         self._finalize_record(records, current_record, tx_type, allowed_types, include_raw, current_raw)
@@ -259,19 +274,22 @@ class ParseX12ToJSON(FlowFileTransform):
                 idx = int(idx_str)
                 val = self._el(elements, idx)
                 if val:
-                    if sub_sep and sub_sep in val:
-                        val = val.split(sub_sep)[0]
+                    # Preserve composite sub-elements intact (e.g., "ABK:J0600").
+                    # Downstream (Gold layer) extracts the value portion.
                     if field_name in record:
                         existing = record[field_name]
                         if isinstance(existing, list):
                             existing.append(val)
                         else:
-                            record[field_name] = [existing, val]
+                            record[field_name] = existing + ";" + val
                     else:
                         record[field_name] = val
 
-        positional_key = f"{seg_id}_{self._el(elements, 1) or ''}"
-        if positional_key not in field_map and seg_id not in field_map:
+        # Only emit positional fallback keys for unmapped segments if
+        # the transaction type itself has no field map (fully unknown type).
+        # For known types, unmapped segments are silently skipped.
+        if not field_map:
+            positional_key = f"{seg_id}_{self._el(elements, 1) or ''}"
             for i, el in enumerate(elements[1:], start=1):
                 el_val = el.strip()
                 if el_val:

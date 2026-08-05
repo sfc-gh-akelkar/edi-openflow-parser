@@ -1,9 +1,11 @@
 ------------------------------------------------------------------------
 -- X12 EDI Pipeline: Prerequisites
 -- Run BEFORE setting up Openflow or creating pipeline tables.
+-- Requires a role with CREATE DATABASE, CREATE WAREHOUSE privileges.
 ------------------------------------------------------------------------
 
-USE ROLE ACCOUNTADMIN;
+-- Use a role with sufficient privileges (SYSADMIN recommended, or a custom role)
+-- USE ROLE SYSADMIN;
 
 -- 1. Warehouse (for Dynamic Table refresh)
 CREATE WAREHOUSE IF NOT EXISTS APP_WH

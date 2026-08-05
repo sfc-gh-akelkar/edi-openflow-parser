@@ -3,9 +3,11 @@
 -- These tables receive structured JSON from ParseX12ToJSON via Openflow.
 -- Each table matches the exact field names output by the parser.
 -- No parsing happens in Snowflake — data arrives structured.
+--
+-- NOTE: Uses CREATE TABLE IF NOT EXISTS to be safe for re-runs.
+-- All columns are VARCHAR — required for Snowpipe Streaming compatibility.
 ------------------------------------------------------------------------
 
-USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE APP_WH;
 
 CREATE DATABASE IF NOT EXISTS X12_EDI_AI;
@@ -17,7 +19,7 @@ CREATE SCHEMA IF NOT EXISTS X12_EDI_AI.REMITTANCES;
 -- 837: Professional Claims
 -- Record boundary: CLM (one record per claim)
 ------------------------------------------------------------------------
-CREATE OR REPLACE TABLE X12_EDI_AI.CLAIMS.LANDING_837_CLAIMS (
+CREATE TABLE IF NOT EXISTS X12_EDI_AI.CLAIMS.LANDING_837_CLAIMS (
     -- Envelope (from ISA/GS when Include Envelope = true)
     transaction_type                VARCHAR(10),
     transaction_set_control_number  VARCHAR(20),
@@ -101,7 +103,7 @@ CREATE OR REPLACE TABLE X12_EDI_AI.CLAIMS.LANDING_837_CLAIMS (
 -- 834: Benefit Enrollment and Maintenance
 -- Record boundary: INS (one record per member action)
 ------------------------------------------------------------------------
-CREATE OR REPLACE TABLE X12_EDI_AI.ENROLLMENTS.LANDING_834_ENROLLMENTS (
+CREATE TABLE IF NOT EXISTS X12_EDI_AI.ENROLLMENTS.LANDING_834_ENROLLMENTS (
     -- Envelope
     transaction_type                VARCHAR(10),
     transaction_set_control_number  VARCHAR(20),
@@ -174,7 +176,7 @@ CREATE OR REPLACE TABLE X12_EDI_AI.ENROLLMENTS.LANDING_834_ENROLLMENTS (
 -- 835: Health Care Claim Payment/Advice (Remittance)
 -- Record boundary: CLP (one record per claim payment)
 ------------------------------------------------------------------------
-CREATE OR REPLACE TABLE X12_EDI_AI.REMITTANCES.LANDING_835_REMITTANCES (
+CREATE TABLE IF NOT EXISTS X12_EDI_AI.REMITTANCES.LANDING_835_REMITTANCES (
     -- Envelope
     transaction_type                VARCHAR(10),
     transaction_set_control_number  VARCHAR(20),

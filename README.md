@@ -277,19 +277,24 @@ maps for 837 claims — I want to see what fields are being extracted.
 
 ## Transaction Types Supported
 
-Out of the box (configurable via YAML):
+### Deployed (landing tables + Gold DTs included)
 
 | Code | Name | Key Fields Extracted | Example Use |
 |------|------|---------------------|-------------|
 | 837 | Health Care Claim | Claim ID, diagnosis codes, procedures, providers, amounts, dates | Claim analytics, denial management |
 | 835 | Claim Payment/Remittance | Claim ID, payment amount, adjustments, service lines | Payment reconciliation, underpayment detection |
 | 834 | Benefit Enrollment | Member ID, demographics, coverage dates, plan info | Enrollment tracking, coverage gap analysis |
+
+### Parseable (field maps included, extend with `/edi:extend` to generate DDL)
+
+| Code | Name | Key Fields Extracted | Example Use |
+|------|------|---------------------|-------------|
 | 270 | Eligibility Inquiry | Subscriber, provider, service type, date range | Eligibility verification automation |
 | 271 | Eligibility Response | Benefits, coverage levels, copays, deductibles | Real-time benefit display |
 | 276 | Claim Status Request | Trace number, claim reference, service dates | Claim follow-up automation |
 | 277 | Claim Status Response | Status codes, action codes, payment amounts | Denial tracking, appeal prioritization |
 
-Adding a custom type: run `/edi:extend` or edit `config/x12_known_types.yaml`. No code changes required.
+Adding a custom type: run `/edi:extend` to generate landing tables, Gold DTs, and tests. Or edit `config/x12_known_types.yaml` directly.
 
 ---
 
@@ -308,4 +313,4 @@ Adding a custom type: run `/edi:extend` or edit `config/x12_known_types.yaml`. N
 
 ## License
 
-BSD-3-Clause
+Apache-2.0

@@ -2,19 +2,25 @@
 -- X12 EDI Pipeline: Gold Layer (AI Enrichment)
 -- Data arrives already structured from ParseX12ToJSON.
 -- Gold layer adds: type casting, AI diagnosis enrichment, analytics views.
+--
+-- WARNING: CREATE OR REPLACE DYNAMIC TABLE reinitializes the DT, causing
+-- a full re-invocation of AI_COMPLETE over all rows. Only run this script
+-- for initial setup or when intentionally resetting the Gold layer.
 ------------------------------------------------------------------------
 
-USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE APP_WH;
 
 CREATE SCHEMA IF NOT EXISTS X12_EDI_AI.GOLD;
 
 ------------------------------------------------------------------------
 -- GOLD: Claims with AI-enriched diagnosis
--- Adds human-readable diagnosis descriptions via Claude Sonnet 4-6
+-- Single AI_COMPLETE call per row using response_format for clean JSON.
+-- Composites arrive intact (e.g., "ABK:J0600"); we extract the code
+-- portion with SPLIT_PART and NULLIF to fail loudly on empty.
 ------------------------------------------------------------------------
 CREATE OR REPLACE DYNAMIC TABLE X12_EDI_AI.GOLD.GOLD_CLAIMS
     TARGET_LAG = '10 minutes'
+    REFRESH_MODE = INCREMENTAL
     WAREHOUSE = APP_WH
 AS
 WITH base AS (
@@ -31,8 +37,8 @@ WITH base AS (
         billing_provider_npi,
         rendering_provider_last_name,
         rendering_provider_npi,
-        SPLIT_PART(diagnosis_code_1, ':', 2) AS primary_diagnosis_code,
-        SPLIT_PART(procedure_code, ':', 2) AS primary_procedure_code,
+        NULLIF(SPLIT_PART(diagnosis_code_1, ':', 2), '') AS primary_diagnosis_code,
+        NULLIF(SPLIT_PART(procedure_code, ':', 2), '') AS primary_procedure_code,
         TRY_TO_DECIMAL(service_charge_amount, 12, 2) AS service_charge_amount,
         TRY_TO_DATE(service_date, 'YYYYMMDD') AS service_date,
         payer_responsibility_sequence,
@@ -41,43 +47,39 @@ WITH base AS (
         interchange_receiver_id
     FROM X12_EDI_AI.CLAIMS.LANDING_837_CLAIMS
     WHERE claim_id IS NOT NULL
+),
+enriched AS (
+    SELECT
+        b.*,
+        CASE
+            WHEN b.primary_diagnosis_code IS NOT NULL THEN
+                AI_COMPLETE('claude-sonnet-4-6',
+                    'You are a medical coding expert. Given ICD-10 code: '
+                    || b.primary_diagnosis_code
+                    || '. Return description, category, and whether chronic.',
+                    {'response_format': {'type': 'json', 'schema': {'type': 'object', 'properties': {
+                        'description': {'type': 'string'},
+                        'category': {'type': 'string', 'enum': ['Respiratory','Cardiovascular','Musculoskeletal','Endocrine','Gastrointestinal','Infectious','Neoplasm','Injury','Mental Health','Other']},
+                        'chronic': {'type': 'boolean'}
+                    }, 'required': ['description', 'category', 'chronic']}}}
+                )
+            ELSE NULL
+        END AS ai_result
+    FROM base b
 )
 SELECT
-    b.*,
-    TRY_PARSE_JSON(
-        AI_COMPLETE('claude-sonnet-4-6',
-            'You are a medical coding expert. Given this ICD-10 code, return a JSON object with keys: '
-            || '"description" (human-readable diagnosis name), '
-            || '"category" (Respiratory, Cardiovascular, Musculoskeletal, Endocrine, Gastrointestinal, Infectious, Neoplasm, Injury, Mental Health, Other), '
-            || '"chronic" (true/false). Return ONLY valid JSON. ICD-10 code: '
-            || COALESCE(b.primary_diagnosis_code, 'Z00.00')
-        )
-    ):description::VARCHAR AS diagnosis_description,
-    TRY_PARSE_JSON(
-        AI_COMPLETE('claude-sonnet-4-6',
-            'You are a medical coding expert. Given this ICD-10 code, return a JSON object with keys: '
-            || '"description" (human-readable diagnosis name), '
-            || '"category" (Respiratory, Cardiovascular, Musculoskeletal, Endocrine, Gastrointestinal, Infectious, Neoplasm, Injury, Mental Health, Other), '
-            || '"chronic" (true/false). Return ONLY valid JSON. ICD-10 code: '
-            || COALESCE(b.primary_diagnosis_code, 'Z00.00')
-        )
-    ):category::VARCHAR AS diagnosis_category,
-    TRY_PARSE_JSON(
-        AI_COMPLETE('claude-sonnet-4-6',
-            'You are a medical coding expert. Given this ICD-10 code, return a JSON object with keys: '
-            || '"description" (human-readable diagnosis name), '
-            || '"category" (Respiratory, Cardiovascular, Musculoskeletal, Endocrine, Gastrointestinal, Infectious, Neoplasm, Injury, Mental Health, Other), '
-            || '"chronic" (true/false). Return ONLY valid JSON. ICD-10 code: '
-            || COALESCE(b.primary_diagnosis_code, 'Z00.00')
-        )
-    ):chronic::BOOLEAN AS is_chronic_condition
-FROM base b;
+    e.* EXCLUDE (ai_result),
+    ai_result:description::VARCHAR AS diagnosis_description,
+    ai_result:category::VARCHAR AS diagnosis_category,
+    ai_result:chronic::BOOLEAN AS is_chronic_condition
+FROM enriched e;
 
 ------------------------------------------------------------------------
 -- GOLD: Enrollments (typed, no AI needed)
 ------------------------------------------------------------------------
 CREATE OR REPLACE DYNAMIC TABLE X12_EDI_AI.GOLD.GOLD_ENROLLMENTS
     TARGET_LAG = '10 minutes'
+    REFRESH_MODE = INCREMENTAL
     WAREHOUSE = APP_WH
 AS
 SELECT
@@ -112,6 +114,7 @@ WHERE member_id IS NOT NULL;
 ------------------------------------------------------------------------
 CREATE OR REPLACE DYNAMIC TABLE X12_EDI_AI.GOLD.GOLD_REMITTANCES
     TARGET_LAG = '10 minutes'
+    REFRESH_MODE = INCREMENTAL
     WAREHOUSE = APP_WH
 AS
 SELECT
@@ -127,7 +130,7 @@ SELECT
     patient_id,
     rendering_provider_last_name,
     rendering_provider_npi,
-    SPLIT_PART(procedure_code, ':', 2) AS procedure_code,
+    NULLIF(SPLIT_PART(procedure_code, ':', 2), '') AS procedure_code,
     TRY_TO_DECIMAL(service_charge_amount, 12, 2) AS service_charge_amount,
     TRY_TO_DECIMAL(service_payment_amount, 12, 2) AS service_payment_amount,
     TRY_TO_DECIMAL(allowed_amount, 12, 2) AS allowed_amount,
@@ -139,24 +142,3 @@ SELECT
     interchange_receiver_id
 FROM X12_EDI_AI.REMITTANCES.LANDING_835_REMITTANCES
 WHERE claim_id IS NOT NULL;
-
-------------------------------------------------------------------------
--- SAMPLE ANALYTICS QUERIES
-------------------------------------------------------------------------
-
--- Claims by diagnosis category
--- SELECT diagnosis_category, COUNT(*) AS claims, AVG(claim_amount) AS avg_billed
--- FROM X12_EDI_AI.GOLD.GOLD_CLAIMS
--- GROUP BY 1 ORDER BY 2 DESC;
-
--- Payment variance analysis
--- SELECT claim_id, claim_charge_amount, claim_payment_amount, adjustment_total,
---        adjustment_group_code, adjustment_reason_code_1
--- FROM X12_EDI_AI.GOLD.GOLD_REMITTANCES
--- WHERE adjustment_total > 100
--- ORDER BY adjustment_total DESC LIMIT 20;
-
--- Enrollment activity
--- SELECT maintenance_type_code, plan_coverage_description, COUNT(*) AS member_actions
--- FROM X12_EDI_AI.GOLD.GOLD_ENROLLMENTS
--- GROUP BY 1, 2 ORDER BY 3 DESC;

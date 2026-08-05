@@ -1,33 +1,33 @@
 #!/bin/bash
 # enforce-contract.sh — PreToolUse hook for edi-openflow-parser
-# Blocks operations that violate the execution contract
+# Blocks operations that violate the execution contract.
+#
+# CoCo passes hook context as JSON on stdin. Exit code 2 blocks the action
+# (with reason on stderr). Any other exit code allows the action to proceed.
 
-INPUT="$1"
+INPUT=$(cat)
+SQL=$(echo "$INPUT" | jq -r '.tool_input.sql // .tool_input.command // empty' 2>/dev/null)
 
-# Block direct CREATE TABLE outside prescribed schemas
-if echo "$INPUT" | grep -qi "CREATE.*TABLE" && ! echo "$INPUT" | grep -qi "only_compile"; then
-  if ! echo "$INPUT" | grep -qi "CLAIMS\|ENROLLMENTS\|REMITTANCES\|GOLD\|RAW_EDI"; then
-    echo "BLOCKED: CREATE TABLE must target prescribed schemas (CLAIMS, ENROLLMENTS, REMITTANCES, GOLD, or RAW_EDI). Update config/edi_format_specs.yaml instead."
-    exit 1
-  fi
+if [ -z "$SQL" ]; then
+  exit 0
 fi
 
 # Block PutSnowpipeStreaming2 references
-if echo "$INPUT" | grep -qi "PutSnowpipeStreaming2"; then
-  echo "BLOCKED: Use PutSnowpipeStreaming v1 (Record Reader + Table target), not PutSnowpipeStreaming2."
-  exit 1
+if echo "$SQL" | grep -qi "PutSnowpipeStreaming2"; then
+  echo "Use PutSnowpipeStreaming v1 (Record Reader + Table target), not PutSnowpipeStreaming2." >&2
+  exit 2
 fi
 
 # Block manual NAR packaging
-if echo "$INPUT" | grep -qi "zip.*\.nar\|jar.*\.nar"; then
-  echo "BLOCKED: Use 'hatch build --target nar' for NAR packaging. Never manual zip/jar."
-  exit 1
+if echo "$SQL" | grep -qi "zip.*\.nar\|jar.*\.nar"; then
+  echo "Use 'hatch build --target nar' for NAR packaging. Never manual zip/jar." >&2
+  exit 2
 fi
 
-# Block network policy changes without the network phase
-if echo "$INPUT" | grep -qi "ALTER.*NETWORK.*POLICY\|CREATE.*NETWORK.*POLICY"; then
-  echo "BLOCKED: Network policy changes must go through the edi-deploy network verification phase. Run /edi:deploy first."
-  exit 1
+# Block network policy changes outside the deploy skill
+if echo "$SQL" | grep -qi "ALTER.*NETWORK.*POLICY\|CREATE.*NETWORK.*POLICY"; then
+  echo "Network policy changes must go through the edi-deploy network verification phase. Run /edi:deploy first." >&2
+  exit 2
 fi
 
 exit 0

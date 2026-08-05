@@ -2,9 +2,9 @@
   "name": "edi-openflow-parser",
   "version": "1.0.0",
   "description": "EDI parsing framework for Snowflake. Guides customers through extending an Openflow-based EDI pipeline for any transaction format (X12 834/835/837/270-277 pre-built, extensible to any EDI type). Includes AI-assisted field map generation, typed landing tables, Gold Dynamic Tables with Cortex AI enrichment, and a Python UDF lite path for environments without Openflow.",
-  "author": "Adwait Kelkar (sfc-gh-akelkar)",
-  "repository": "https://github.com/sfc-gh-akelkar/edi-openflow-parser",
-  "keywords": ["edi", "x12", "hipaa", "healthcare", "openflow", "parsing", "interoperability"],
+  "author": { "name": "Snowflake HCLS Solutions" },
+  "repository": "https://github.com/Snowflake-Solutions/health-sciences-coco-skills-incubator",
+  "skills": "./skills",
   "hooks": {
     "PreToolUse": [
       {
